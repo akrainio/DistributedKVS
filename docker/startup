@@ -1,0 +1,4 @@
+project_home=$(dirname $0)
+export JAVA_HOME=$project_home/java
+export JAVA_OPTS="-Xmx500M -Xms500M -Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=9988 -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false"
+$project_home/tomcat/bin/catalina.sh run

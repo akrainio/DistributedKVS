@@ -1,0 +1,4 @@
+for each key in map,
+if getNode(key) != this node
+    put key into correct node   needs to be done in KVSJersey
+    remove key                  ditto

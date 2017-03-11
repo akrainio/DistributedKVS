@@ -1,0 +1,89 @@
+echo curl -X PUT -d "val=amyVal" localhost:8080/kvs/amy
+curl -X PUT -d "val=amyVal" localhost:8080/kvs/amy
+echo curl -X PUT -d "val=amyVal" localhost:8080/kvs/ana
+curl -X PUT -d "val=amyVal" localhost:8080/kvs/ana
+echo curl -X PUT -d "val=amyVal" localhost:8080/kvs/al
+curl -X PUT -d "val=amyVal" localhost:8080/kvs/al
+
+echo curl -X PUT -d "val=baneVal" localhost:8080/kvs/bane
+curl -X PUT -d "val=baneVal" localhost:8080/kvs/bane
+echo curl -X PUT -d "val=baneVal" localhost:8080/kvs/borimir
+curl -X PUT -d "val=baneVal" localhost:8080/kvs/borimir
+echo curl -X PUT -d "val=baneVal" localhost:8080/kvs/bruce
+curl -X PUT -d "val=baneVal" localhost:8080/kvs/bruce
+
+echo curl -X PUT -d "val=coreyVal" localhost:8080/kvs/corey
+curl -X PUT -d "val=coreyVal" localhost:8080/kvs/corey
+echo curl -X PUT -d "val=coreyVal" localhost:8080/kvs/carl
+curl -X PUT -d "val=coreyVal" localhost:8080/kvs/carl
+echo curl -X PUT -d "val=coreyVal" localhost:8080/kvs/chap
+curl -X PUT -d "val=coreyVal" localhost:8080/kvs/chap
+
+echo curl -X GET localhost:8080/kvs/amy
+curl -X GET localhost:8080/kvs/amy
+echo curl -X GET localhost:8080/kvs/ana
+curl -X GET localhost:8080/kvs/ana
+echo curl -X GET localhost:8080/kvs/al
+curl -X GET localhost:8080/kvs/al
+
+echo curl -X GET localhost:8080/kvs/bane
+curl -X GET localhost:8080/kvs/bane
+echo curl -X GET localhost:8080/kvs/borimir
+curl -X GET localhost:8080/kvs/borimir
+echo curl -X GET localhost:8080/kvs/bruce
+curl -X GET localhost:8080/kvs/bruce
+
+echo curl -X GET localhost:8080/kvs/corey
+curl -X GET localhost:8080/kvs/corey
+echo curl -X GET localhost:8080/kvs/carl
+curl -X GET localhost:8080/kvs/carl
+echo curl -X GET localhost:8080/kvs/chap
+curl -X GET localhost:8080/kvs/chap
+
+echo curl -X PUT -d "ip_port=localhost:8082" localhost:8080/kvs/view_update?type=add
+curl -X PUT -d "ip_port=localhost:8082" localhost:8080/kvs/view_update?type=add
+
+echo curl -X GET localhost:8080/kvs/amy
+curl -X GET localhost:8080/kvs/amy
+echo curl -X GET localhost:8080/kvs/ana
+curl -X GET localhost:8080/kvs/ana
+echo curl -X GET localhost:8080/kvs/al
+curl -X GET localhost:8080/kvs/al
+
+echo curl -X GET localhost:8080/kvs/bane
+curl -X GET localhost:8080/kvs/bane
+echo curl -X GET localhost:8080/kvs/borimir
+curl -X GET localhost:8080/kvs/borimir
+echo curl -X GET localhost:8080/kvs/bruce
+curl -X GET localhost:8080/kvs/bruce
+
+echo curl -X GET localhost:8080/kvs/corey
+curl -X GET localhost:8080/kvs/corey
+echo curl -X GET localhost:8080/kvs/carl
+curl -X GET localhost:8080/kvs/carl
+echo curl -X GET localhost:8080/kvs/chap
+curl -X GET localhost:8080/kvs/chap
+
+echo curl -X PUT -d "ip_port=localhost:8081" localhost:8080/kvs/view_update?type=remove
+curl -X PUT -d "ip_port=localhost:8081" localhost:8080/kvs/view_update?type=remove
+
+echo curl -X GET localhost:8080/kvs/amy
+curl -X GET localhost:8080/kvs/amy
+echo curl -X GET localhost:8080/kvs/ana
+curl -X GET localhost:8080/kvs/ana
+echo curl -X GET localhost:8080/kvs/al
+curl -X GET localhost:8080/kvs/al
+
+echo curl -X GET localhost:8080/kvs/bane
+curl -X GET localhost:8080/kvs/bane
+echo curl -X GET localhost:8080/kvs/borimir
+curl -X GET localhost:8080/kvs/borimir
+echo curl -X GET localhost:8080/kvs/bruce
+curl -X GET localhost:8080/kvs/bruce
+
+echo curl -X GET localhost:8080/kvs/corey
+curl -X GET localhost:8080/kvs/corey
+echo curl -X GET localhost:8080/kvs/carl
+curl -X GET localhost:8080/kvs/carl
+echo curl -X GET localhost:8080/kvs/chap
+curl -X GET localhost:8080/kvs/chap
