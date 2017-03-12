@@ -20,18 +20,25 @@ class KeyValueServiceJersey extends KeyValueService {
 
   val kvsImpl = new KeyValueServiceImpl(ThisIpport)
 
+  var partionIndex = 0
+
   var NodeIndex = 0
 
-  var view: Vector[(KeyValueService, String)] = sys.env.get("VIEW") match {
-    case Some(x) => x.split(",").toVector.zipWithIndex.map {
-      case (s, i) => s match {
-        case ThisIpport => NodeIndex = i
-          (kvsImpl, ThisIpport)
-        case _ => (new KeyValueServiceProxy(s), s)
-      }
-    }
-    case None => Vector((kvsImpl, ThisIpport))
+  var k = sys.env.get("K") match {
+    case Some(x) => x
+    case None => 0
   }
+
+  var view: Vector[Vector[(KeyValueService, String)]] = sys.env.get("VIEW") match {
+    case Some(x) => makeView(x)
+    case None => Vector(Vector[(KeyValueService, String)](kvsImpl, ThisIpport))
+  }
+
+//  var view: Vector[Vector[(KeyValueService, String)]] = sys.env.get("VIEW") match {
+//    case Some(x) => for (p <- x.split(",").toVector.zipWithIndex; i = 0) {
+//
+//    }
+//  }
 
   @GET
   @Path("{key}")
@@ -83,7 +90,7 @@ class KeyValueServiceJersey extends KeyValueService {
   @Path("internal_update")
   @Produces(Array(APPLICATION_JSON))
   override def internalUpdate(@FormParam("new_view") newView: String) = {
-    view = makeView(newView.split(",").toVector)
+    view = makeView(newView)
     jsonResp(200)("msg" -> "success")
   }
 
@@ -136,14 +143,15 @@ class KeyValueServiceJersey extends KeyValueService {
     }
   }
 
-  private def makeView(newView: Vector[String]): Vector[(KeyValueService, String)] = {
-    var view: Vector[(KeyValueService, String)] = newView.map((s: String) => (new KeyValueServiceProxy(s), s))
-    view = newView.zipWithIndex.map {
-      case (s, i) => s match {
-        case ThisIpport => (kvsImpl, ThisIpport)
-        case _ => (new KeyValueServiceProxy(s), s)
+  private def makeView(newView: String): Vector[Vector[(KeyValueService, String)]] = {
+    val view: Vector[Vector[(KeyValueService, String)]] = newView.split("\\|").map { (s: String) =>
+      s.split(",").toVector.zipWithIndex.map {
+        case (x, i) => x match {
+          case ThisIpport => (kvsImpl, ThisIpport)
+          case _ => (new KeyValueServiceProxy(s), s)
+        }
       }
-    }
+    }.toVector
     fixNodeIndex()
     view
   }
