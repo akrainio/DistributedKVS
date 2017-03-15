@@ -24,8 +24,9 @@ class KeyValueServiceJersey extends KeyValueService {
 
   var NodeIndex = 0
 
-  var k = sys.env.get("K") match {
-    case Some(x) => x
+  var k: Int = sys.env.get("K") match {
+    // Should I use try/catch here?
+    case Some(x) => x.toInt
     case None => 0
   }
 
@@ -33,12 +34,6 @@ class KeyValueServiceJersey extends KeyValueService {
     case Some(x) => makeView(x)
     case None => Vector(Vector[(KeyValueService, String)](kvsImpl, ThisIpport))
   }
-
-//  var view: Vector[Vector[(KeyValueService, String)]] = sys.env.get("VIEW") match {
-//    case Some(x) => for (p <- x.split(",").toVector.zipWithIndex; i = 0) {
-//
-//    }
-//  }
 
   @GET
   @Path("{key}")
@@ -120,7 +115,26 @@ class KeyValueServiceJersey extends KeyValueService {
   }
 
   private def addNode(ipport: String): Unit = {
+    for (part <- view.zipWithIndex) {
+      if (part._1.length < k) {
+        view(part._2) = part._1 :+ (new KeyValueServiceProxy(ipport), ipport)
+      }
+    }
     view = view :+ (new KeyValueServiceProxy(ipport), ipport)
+
+    for {
+      partition <- view
+      flag = false
+    } yield {
+      if (flag) {
+        partition
+      } else {
+        if (partition.length < k) {
+          partition :+ ipport
+        }
+      }
+    }
+
     for (n <- view) n._1.internalUpdate(viewToString(view))
     for (n <- view) n._1.rebal()
     rebalance()
@@ -144,14 +158,18 @@ class KeyValueServiceJersey extends KeyValueService {
   }
 
   private def makeView(newView: String): Vector[Vector[(KeyValueService, String)]] = {
-    val view: Vector[Vector[(KeyValueService, String)]] = newView.split("\\|").map { (s: String) =>
-      s.split(",").toVector.zipWithIndex.map {
-        case (x, i) => x match {
-          case ThisIpport => (kvsImpl, ThisIpport)
-          case _ => (new KeyValueServiceProxy(s), s)
+    val view = for {
+      partition <- newView.split("\\|").toVector
+    } yield {
+      for {
+        node <- partition.split(",")
+      } yield {
+        node match {
+          case ThisIpport => Vector((kvsImpl, node))
+          case _ => Vector((new KeyValueServiceProxy(node), node))
         }
       }
-    }.toVector
+    }
     fixNodeIndex()
     view
   }
