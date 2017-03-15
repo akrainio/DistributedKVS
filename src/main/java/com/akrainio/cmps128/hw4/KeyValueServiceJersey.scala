@@ -115,14 +115,14 @@ class KeyValueServiceJersey extends KeyValueService {
   }
 
   private def addNode(ipport: String): Unit = {
-    for (part <- view.zipWithIndex) {
-      if (part._1.length < k) {
-        view(part._2) = part._1 :+ (new KeyValueServiceProxy(ipport), ipport)
-      }
-    }
-    view = view :+ (new KeyValueServiceProxy(ipport), ipport)
+    // for (part <- view.zipWithIndex) {
+    //   if (part._1.length < k) {
+    //     view(part._2) = part._1 :+ (new KeyValueServiceProxy(ipport), ipport)
+    //   }
+    // }
+    // view = view :+ (new KeyValueServiceProxy(ipport), ipport)
 
-    for {
+    view = for {
       partition <- view
       flag = false
     } yield {
@@ -130,23 +130,45 @@ class KeyValueServiceJersey extends KeyValueService {
         partition
       } else {
         if (partition.length < k) {
-          partition :+ ipport
+          flag = true
+          partition :+ (new KeyValueService(ipport), ipport)
         }
       }
     }
 
-    for (n <- view) n._1.internalUpdate(viewToString(view))
-    for (n <- view) n._1.rebal()
+    // for (n <- view) n._1.internalUpdate(viewToString(view))
+    forNodeInView(view, n: (KeyValueService, String) => n._1.internalUpdate(viewToString(view)))
+    // for (n <- view) n._1.rebal()
+    // Do I need to call fixNodeIndex?
+    forNodeInView(view, n: (KeyValueService, String) => n._1.rebal())
     rebalance()
+  }
+
+  private def forNodeInView(v: Vector(Vector((KeyValueService, String))), f: ((KeyValueService, String) => unit)): unit = {
+    for (partition <- v) {
+      for (node <- partition) {
+        f(node)
+      }
+    }
   }
 
   private def delNode(ipport: String): Unit = {
     val oldView = view
-    view = view.filterNot((p: (KeyValueService, String)) => p._2 == ipport)
-    for (n <- oldView) n._1.internalUpdate(viewToString(view))
+    view = for {
+      partition <- view
+    } yield {
+      val filteredPart = partition.filterNot((p: (KeyValueService, String)) => p._2 == ipport)
+    }
+    forNodeInView(oldView, n: (KeyValueService, String) => n._1.internalUpdate(viewToString(view)))
     fixNodeIndex()
-    for (n <- oldView) n._1.rebal()
+    forNodeInView(oldView, n: (KeyValueService, String) => n._1.rebal())
     rebalance()
+    //
+    // view = view.filterNot((p: (KeyValueService, String)) => p._2 == ipport)
+    // for (n <- oldView) n._1.internalUpdate(viewToString(view))
+    // fixNodeIndex()
+    // for (n <- oldView) n._1.rebal()
+    // rebalance()
   }
 
   private def rebalance(): Unit = {
@@ -158,11 +180,11 @@ class KeyValueServiceJersey extends KeyValueService {
   }
 
   private def makeView(newView: String): Vector[Vector[(KeyValueService, String)]] = {
-    val view = for {
+    val view: Vector[Vector[String]] = for {
       partition <- newView.split("\\|").toVector
     } yield {
       for {
-        node <- partition.split(",")
+        node <- partition.split(",").toVector
       } yield {
         node match {
           case ThisIpport => Vector((kvsImpl, node))
@@ -192,10 +214,15 @@ class KeyValueServiceJersey extends KeyValueService {
 
 object KeyValueServiceJersey {
 
-  private def viewToString(view: Vector[(KeyValueService, String)]): String = {
+  private def viewToString(view: Vector[Vector[(String, String)]]): String = {
     val builder = new StringBuilder
-    for(v <- view) builder.append("," + v._2)
-    builder.deleteCharAt(0)
+    for ((partition, i) <- view.zipWithIndex) {
+      if (i != 0) builder.append("|")
+      for ((node, j) <- partition.zipWithIndex) {
+        if (j != 0) builder.append("," + node._2)
+        else builder.append(node._2)
+      }
+    }
     builder.toString
   }
 
