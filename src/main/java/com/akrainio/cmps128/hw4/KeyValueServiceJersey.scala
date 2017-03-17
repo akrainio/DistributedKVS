@@ -16,24 +16,23 @@ import scala.Int.int2float
 @Path("/kvs/")
 class KeyValueServiceJersey extends KeyValueService {
 
-  val ThisIpport = System.getenv("IPPORT")
-
-  val kvsImpl = new KeyValueServiceImpl(ThisIpport)
-
-  var partionIndex = 0
-
-  var NodeIndex = 0
+  val ThisIpport = sys.env.get("IPPORT") match {
+    case Some(x) => x
+    case None => throw envException
+  }
 
   var k: Int = sys.env.get("K") match {
-    // Should I use try/catch here?
+    // Should I try/catch the number format exception?
     case Some(x) => x.toInt
-    case None => 0
+    case None => throw envException
   }
 
-  var view: Vector[Vector[(KeyValueService, String)]] = sys.env.get("VIEW") match {
-    case Some(x) => makeView(x)
-    case None => Vector(Vector[(KeyValueService, String)](kvsImpl, ThisIpport))
+  var view = sys.env.get("VIEW") match {
+    case Some(x) => new ViewController(ThisIpport, k, x)
+    case None => throw envException
   }
+
+  def envException: IllegalStateException = new IllegalStateException
 
   @GET
   @Path("{key}")
@@ -121,17 +120,18 @@ class KeyValueServiceJersey extends KeyValueService {
     //   }
     // }
     // view = view :+ (new KeyValueServiceProxy(ipport), ipport)
-
+    var flag = false
     view = for {
       partition <- view
-      flag = false
     } yield {
       if (flag) {
         partition
       } else {
         if (partition.length < k) {
           flag = true
-          partition :+ (new KeyValueService(ipport), ipport)
+          partition :+ (new KeyValueServiceProxy(ipport), ipport)
+        } else {
+          partition
         }
       }
     }
@@ -142,14 +142,6 @@ class KeyValueServiceJersey extends KeyValueService {
     // Do I need to call fixNodeIndex?
     forNodeInView(view, n: (KeyValueService, String) => n._1.rebal())
     rebalance()
-  }
-
-  private def forNodeInView(v: Vector(Vector((KeyValueService, String))), f: ((KeyValueService, String) => unit)): unit = {
-    for (partition <- v) {
-      for (node <- partition) {
-        f(node)
-      }
-    }
   }
 
   private def delNode(ipport: String): Unit = {
@@ -179,30 +171,6 @@ class KeyValueServiceJersey extends KeyValueService {
     }
   }
 
-  private def makeView(newView: String): Vector[Vector[(KeyValueService, String)]] = {
-    val view: Vector[Vector[String]] = for {
-      partition <- newView.split("\\|").toVector
-    } yield {
-      for {
-        node <- partition.split(",").toVector
-      } yield {
-        node match {
-          case ThisIpport => Vector((kvsImpl, node))
-          case _ => Vector((new KeyValueServiceProxy(node), node))
-        }
-      }
-    }
-    fixNodeIndex()
-    view
-  }
-
-  private val getNode = (hash: Int) => {
-    val ranges = 100
-    val hashLoc: Float = math.abs(hash) % ranges
-    val sizeOfSegments = int2float(ranges) / view.length
-    math.floor(hashLoc / sizeOfSegments).toInt
-  }
-
   private def getDelegate(key: String): KeyValueService = view(getNode(key.hashCode))._1
 
   private def fixNodeIndex(): Unit = {
@@ -213,18 +181,6 @@ class KeyValueServiceJersey extends KeyValueService {
 }
 
 object KeyValueServiceJersey {
-
-  private def viewToString(view: Vector[Vector[(String, String)]]): String = {
-    val builder = new StringBuilder
-    for ((partition, i) <- view.zipWithIndex) {
-      if (i != 0) builder.append("|")
-      for ((node, j) <- partition.zipWithIndex) {
-        if (j != 0) builder.append("," + node._2)
-        else builder.append(node._2)
-      }
-    }
-    builder.toString
-  }
 
   private def validateKey(key: String)(f: => Response): Response = {
     if (key.length > 250) jsonResp(403)(

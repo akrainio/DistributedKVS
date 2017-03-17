@@ -9,7 +9,7 @@ import javax.ws.rs.core.Response
 import com.akrainio.cmps128.hw4.KeyValueService._
 
 //noinspection TypeAnnotation
-class KeyValueServiceProxy(forwardingAddr: String) extends KeyValueService {
+class KeyValueServiceProxy(val ThisIpport: String) extends KeyValueService {
 
   def get(key: String) = sendRequest(cl.path(key).request.get())
 
@@ -27,7 +27,7 @@ class KeyValueServiceProxy(forwardingAddr: String) extends KeyValueService {
 
   private val cl: WebTarget = {
     val c = newClient
-    c.target(URI.create(s"http://$forwardingAddr/kvs/"))
+    c.target(URI.create(s"http://$ThisIpport/kvs/"))
   }
 
   private def sendRequest(f: => Response): Response = {

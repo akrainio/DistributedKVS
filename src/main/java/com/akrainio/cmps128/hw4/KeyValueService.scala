@@ -9,6 +9,8 @@ import scala.collection._
 
 trait KeyValueService {
 
+  val ThisIpport: String
+
   def get(key: String): Response
 
   def put(key: String, value: String): Response
