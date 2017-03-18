@@ -10,11 +10,11 @@ class ViewController(val ThisIpport: String, val k: Int, viewString: String) {
 
   // Called when this node receives a view update (not internal update!)
   def addNode(ipport: String): Unit = {
-    if (view.tail.length < k) {
+    if (view.last.length < k) {
       view = for {
         part <- view
       } yield {
-        if (part == view.tail) part :+ new KeyValueServiceProxy(ipport)
+        if (part == view.last) part :+ new KeyValueServiceProxy(ipport)
         else part
       }
     } else {
@@ -25,58 +25,24 @@ class ViewController(val ThisIpport: String, val k: Int, viewString: String) {
 
   // Called when this node receives a view update (not internal update!)
   def delNode(ipport: String): Unit = {
-    if (ipport == ThisIpport) {
-      ???
-    }
     val (pIndex, rIndex) = findNode(ipport)
-    if (pIndex + 1 == view.length) {
-      // node is in last partition
-      if (view(pIndex).length > 1) {
 
-        // repartition/rebalance is unnecessary
-        view = for {
-          part <- view
-        } yield {
-          for {
-            repl <- part if repl.ThisIpport != ipport
-          } yield {
-            repl
-          }
-        }
-
-      } else {
-
-        // repartition/rebalance is necessary
-        ???
-
-      }
+    if (view(pIndex).length > 1) {
+      // repartition/rebalance is unnecessary
+      buildViewSamePartitions(ipport)
     } else {
-      // node isn't in last partition
-      if (view(pIndex).length > 1) {
-
-        // repartition/rebalance is unnecessary
-        ???
-
+      // repartition/rebalance is necessary
+      if (view(pIndex) == view.last) {
+        // node is in last partition
+        buildViewWithoutLastPartition(ipport)
       } else {
-
-        // repartition/rebalance is necessary
-        ???
-
+        // node is not in last partition
+        buildViewMoveFromLastPartition(ipport)
       }
+      //rebalance()
+      // is case ipport == ThisIpport necessary?
     }
-  }
 
-  // Returns (partition index, replica index)
-  private def findNode(ipport: String): (Int, Int) = {
-    val self = for {
-      (part, i) <- view.zipWithIndex
-      (repl, j) <- part.zipWithIndex if repl.ThisIpport == ipport
-    } yield (i,j)
-    self.head
-  }
-
-  private def findSelf(): (Int, Int) = {
-    findNode(ThisIpport)
   }
 
   private def buildView(newView: String): List[List[KeyValueService]] = {
@@ -95,9 +61,60 @@ class ViewController(val ThisIpport: String, val k: Int, viewString: String) {
     builtView
   }
 
+  private def buildViewSamePartitions(ipport: String): Unit = {
+    view = for {
+      part <- view
+    } yield {
+      for {
+        repl <- part if repl.ThisIpport != ipport
+      } yield repl
+    }
+  }
+
+  private def buildViewMoveFromLastPartition(ipport: String): Unit = {
+    view = for {
+      part <- view if !(part == view.last && part.length == 1)
+    } yield {
+      if (part == view.last) {
+        // need to remove node
+        if (part.length > 1) part.take(part.length - 1)
+        else part
+      } else {
+        for {
+          repl <- part
+        } yield {
+          if (repl.ThisIpport == ipport) {
+            view.last.last
+          } else {
+            repl
+          }
+        }
+      }
+    }
+  }
+
+  private def buildViewWithoutLastPartition(ipport: String): Unit = {
+    view = for {
+      part <- view if part != view.last
+    } yield part
+  }
+
+  // Returns (partition index, replica index)
+  private def findNode(ipport: String): (Int, Int) = {
+    val self = for {
+      (part, i) <- view.zipWithIndex
+      (repl, j) <- part.zipWithIndex if repl.ThisIpport == ipport
+    } yield (i,j)
+    self.head
+  }
+
+  private def findSelf: (Int, Int) = {
+    findNode(ThisIpport)
+  }
+
   private def rebuildView(newView: String): Unit = {
     view = buildView(newView)
-    findSelf()
+    findSelf
   }
 
   private def getPartition(hash: Int): Int = {
