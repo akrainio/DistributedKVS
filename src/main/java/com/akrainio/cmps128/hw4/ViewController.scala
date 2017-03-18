@@ -9,24 +9,64 @@ class ViewController(val ThisIpport: String, val k: Int, viewString: String) {
   private val kvsImpl = new KeyValueServiceImpl(ThisIpport)
 
   // Called when this node receives a view update (not internal update!)
-  def addNode(): Unit = ???
+  def addNode(ipport: String): Unit = {
+    if (view.tail.length < k) {
+      view = for {
+        part <- view
+        //repl <- part
+      } yield {
+        if (part == view.tail) part :+ new KeyValueServiceProxy(ipport)
+        else part
+      }
+    } else {
+      view = view :+ List(new KeyValueServiceProxy(ipport))
+    }
+  }
 
   // Called when this node receives a view update (not internal update!)
-  def delNode(): Unit = ???
+  def delNode(ipport: String): Unit = {
+    if (ipport == ThisIpport) {
+      ???
+    } else {
+      val (pIndex, rIndex) = findNode(ipport)
+      if (pIndex + 1 == view.length) {
+        view = for {
+          part <- view
+        } yield
+          for {
+            repl <- part if repl.ThisIpport != ipport
+          } yield {
+            repl
+        }
+      } else {
+        ???
+      }
+    }
+  }
 
-  // Returns (partition index, node index)
-  private def findSelf(): (Int, Int) = ???
+  // Returns (partition index, replica index)
+  private def findNode(ipport: String): (Int, Int) = {
+    val self = for {
+      (part, i) <- view.zipWithIndex
+      (repl, j) <- part.zipWithIndex if repl.ThisIpport == ipport
+    } yield (i,j)
+    self.head
+  }
+
+  private def findSelf(): (Int, Int) = {
+    findNode(ThisIpport)
+  }
 
   private def buildView(newView: String): List[List[KeyValueService]] = {
     val builtView = for {
-      partition <- newView.split("\\|").toList
+      part <- newView.split("\\|").toList
     } yield {
       for {
-        node <- partition.split(",").toList
+        repl <- part.split(",").toList
       } yield {
-        node match {
+        repl match {
           case ThisIpport => kvsImpl
-          case _ => new KeyValueServiceProxy(node)
+          case _ => new KeyValueServiceProxy(repl)
         }
       }
     }
