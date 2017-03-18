@@ -13,12 +13,12 @@ class ViewController(val ThisIpport: String, val k: Int, viewString: String) {
     if (view.tail.length < k) {
       view = for {
         part <- view
-        //repl <- part
       } yield {
         if (part == view.tail) part :+ new KeyValueServiceProxy(ipport)
         else part
       }
     } else {
+      // rebalance is necessary
       view = view :+ List(new KeyValueServiceProxy(ipport))
     }
   }
@@ -27,19 +27,41 @@ class ViewController(val ThisIpport: String, val k: Int, viewString: String) {
   def delNode(ipport: String): Unit = {
     if (ipport == ThisIpport) {
       ???
-    } else {
-      val (pIndex, rIndex) = findNode(ipport)
-      if (pIndex + 1 == view.length) {
+    }
+    val (pIndex, rIndex) = findNode(ipport)
+    if (pIndex + 1 == view.length) {
+      // node is in last partition
+      if (view(pIndex).length > 1) {
+
+        // repartition/rebalance is unnecessary
         view = for {
           part <- view
-        } yield
+        } yield {
           for {
             repl <- part if repl.ThisIpport != ipport
           } yield {
             repl
+          }
         }
+
       } else {
+
+        // repartition/rebalance is necessary
         ???
+
+      }
+    } else {
+      // node isn't in last partition
+      if (view(pIndex).length > 1) {
+
+        // repartition/rebalance is unnecessary
+        ???
+
+      } else {
+
+        // repartition/rebalance is necessary
+        ???
+
       }
     }
   }
