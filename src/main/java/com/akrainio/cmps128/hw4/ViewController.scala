@@ -46,7 +46,8 @@ class ViewController(val ThisIpport: String, val k: Int, viewString: String) {
   }
 
   def rebalanceSelf(): Unit = {
-    val evicted = kvsImpl.rebalance(findSelf._2)(getPartition)
+    val curPartition = findSelf._2
+    val evicted = kvsImpl.rebalance(curPartition)(getPartition)
     for (e: (Int, (String, String)) <- evicted) {
       val (newPart, (key, value)) = e
       view(newPart).foreach((kvs: KeyValueService) => kvs.put(key, value))
@@ -174,7 +175,8 @@ class ViewController(val ThisIpport: String, val k: Int, viewString: String) {
     } yield {
       (repl,i,j)
     }
-    self.head
+    if (self.isEmpty) (null, -1, -1)
+    else self.head
   }
 
   private def findSelf: (KeyValueService, Int, Int) = {

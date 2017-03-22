@@ -60,7 +60,8 @@ class KeyValueServiceImpl(val ThisIpport: String) extends KeyValueService{
   def rebalance(PartIndex: Int)(f: String => Int): List[(Int, (String, String))] =  {
     var evicted: List[(Int, (String, String))] = List()
     for ((key, value) <- map) {
-      f(key) match {
+      val updatedPartitionIndex = f(key)
+      updatedPartitionIndex match {
         case PartIndex =>
         case x =>
           del(key)

@@ -7,3 +7,7 @@ curl -X GET localhost:8081/kvs/suh
 curl -X GET localhost:8083/kvs/get_partition_id
 curl -X GET localhost:8083/kvs/get_all_partition_ids
 curl -X GET localhost:8083/kvs/get_partition_members -d 'partition_id=1'
+
+// Remove wasn't rebalancing properly
+// rebal seems to be called multiple times only in the node that called it, rather than propagating
+// Problem is in findNode, since node loses track of its partition
