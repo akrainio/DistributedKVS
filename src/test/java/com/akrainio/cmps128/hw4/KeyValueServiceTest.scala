@@ -16,8 +16,6 @@ import org.junit.{AfterClass, BeforeClass, Test}
 
 class KeyValueServiceTest {
 
-  val responder = new KeyValueServiceJersey
-
   @Test
   def testPutGet(): Unit = {
     val key = uniqueKey();
@@ -130,52 +128,6 @@ class KeyValueServiceTest {
     }
   }
 
-  @Test
-  def testDelete(): Unit = {
-    val key = uniqueKey();
-    {
-      request(key).put(form(toMultiValuedMap("val", "b")))
-      val resp = request(key).delete()
-      assertEquals(200, resp.getStatus)
-      assertEquals(APPLICATION_JSON_TYPE, resp.getMediaType)
-      assertEquals(
-        """{
-          |  "msg" : "success",
-          |  "owner" : null
-          |}""".stripMargin,
-        resp.readEntity(classOf[String])
-      )
-    }
-    {
-      val resp = request(key).get()
-      assertEquals(404, resp.getStatus)
-      assertEquals(APPLICATION_JSON_TYPE, resp.getMediaType)
-      assertEquals(
-        """{
-          |  "msg" : "error",
-          |  "error" : "key does not exist",
-          |  "owner" : null
-          |}""".stripMargin,
-        resp.readEntity(classOf[String])
-      )
-    }
-  }
-
-  @Test
-  def testDeleteNonExistent(): Unit = {
-    val key = uniqueKey()
-    val resp = request(key).delete()
-    assertEquals(404, resp.getStatus)
-    assertEquals(APPLICATION_JSON_TYPE, resp.getMediaType)
-    assertEquals(
-      """{
-        |  "msg" : "error",
-        |  "error" : "key does not exist",
-        |  "owner" : null
-        |}""".stripMargin,
-      resp.readEntity(classOf[String])
-    )
-  }
 }
 
 object KeyValueServiceTest {

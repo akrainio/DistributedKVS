@@ -1,0 +1,18 @@
+Put requests update local kvs, and also send a special non-propagating put request to all replicas. Doesn't wait for a
+response from replicas.
+
+Get requests simply respond with whatever is in the local kvs
+
+Eventual consistency is achieved through gossip, where replicas would randomly send each other their vector clock, a
+timestamp, view, and their entire kvs (or maybe their maps hashcode)
+If a replica receives a kvs that doesn't match its own, it compares sent vector clock to try to establish causality.
+If causality can't be established, it uses the timestamp, and if they are the same the winner is picked by node id. Once
+a winner is selected, the loser updates their map to match the winner's.
+If using hash codes to compare: If winner is the receiver, then winner sends loser its kvs and view. Otherwise winner
+sends request to loser, who responds to winner by sending its kvs and view.
+Edge cases for gossip:
+Sender gets a put request before receiver responds:
+    Receiver would have gotten that request too
+    if before the it got gossip:
+
+Sender gets request to remove receiver

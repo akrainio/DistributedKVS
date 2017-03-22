@@ -15,11 +15,11 @@ trait KeyValueService {
 
   def put(key: String, value: String): Response
 
-  def del(key: String): Response
+  def putInternal(internal: String, key: String, value: String): Response
 
   def updateView(updateType: String, ipport: String): Response
 
-  def internalUpdate(newView: String): Response
+  def internalUpdate(newView: String): Unit
 
   def rebal(): Response
 

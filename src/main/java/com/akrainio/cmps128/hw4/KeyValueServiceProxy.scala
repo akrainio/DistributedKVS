@@ -1,6 +1,9 @@
 package com.akrainio.cmps128.hw4
 
+import java.io.IOException
 import java.net.{ConnectException, URI}
+import java.util.logging.Level
+import java.util.logging.Logger.getLogger
 import javax.ws.rs.client.ClientBuilder.newClient
 import javax.ws.rs.client.Entity.form
 import javax.ws.rs.client.{Entity, WebTarget}
@@ -11,19 +14,27 @@ import com.akrainio.cmps128.hw4.KeyValueService._
 //noinspection TypeAnnotation
 class KeyValueServiceProxy(val ThisIpport: String) extends KeyValueService {
 
-  def get(key: String) = sendRequest(cl.path(key).request.get())
+  private val Logger = getLogger(classOf[KeyValueServiceJersey].getName + ThisIpport)
 
-  def put(key: String, value: String) = {
+  override def get(key: String) = sendRequest(cl.path(key).request.get())
+
+  override def put(key: String, value: String) = {
     sendRequest(cl.path(key).request.put(form(toMultiValuedMap("val", value))))
   }
 
-  def del(key: String) = sendRequest(cl.path(key).request.delete())
+  override def putInternal(internal: String, key: String, value: String) = {
+    sendRequest(cl.path(key).queryParam("internal", internal).request.put(form(toMultiValuedMap("val", value))))
+  }
 
-  def updateView(updateType: String, ipport: String) = sendRequest(cl.path("view_update").queryParam("type", updateType).request.put(form(toMultiValuedMap("ip_port", ipport))))
+  override def updateView(updateType: String, ipport: String) = {
+    sendRequest(cl.path("view_update").queryParam("type", updateType).request.put(form(toMultiValuedMap("ip_port", ipport))))
+  }
 
-  def internalUpdate(newView: String) = sendRequest(cl.path("internal_update").request.put(form(toMultiValuedMap("new_view", newView))))
+  override def internalUpdate(newView: String) = {
+    sendRequest(cl.path("internal_update").request.put(form(toMultiValuedMap("new_view", newView))))
+  }
 
-  def rebal() = sendRequest(cl.path("rebalance").request.post(Entity.text("")))
+  override def rebal() = sendRequest(cl.path("rebalance").request.post(Entity.text("")))
 
   private val cl: WebTarget = {
     val c = newClient
@@ -34,10 +45,12 @@ class KeyValueServiceProxy(val ThisIpport: String) extends KeyValueService {
     try {
       f
     } catch {
-      case e: ConnectException => jsonResp(404)(
-        "msg" -> "error",
-        "error" -> "service is not available"
-      )
+      case e: IOException =>
+        Logger.log(Level.SEVERE, e.getMessage, e)
+        jsonResp(404)(
+          "msg" -> "error",
+          "error" -> "service is not available"
+        )
     }
   }
 

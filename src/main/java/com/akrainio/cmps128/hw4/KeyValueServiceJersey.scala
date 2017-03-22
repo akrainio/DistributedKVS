@@ -1,77 +1,114 @@
 package com.akrainio.cmps128.hw4
 
+import java.io.IOException
+import java.util.logging.Logger.getLogger
 import javax.inject.Singleton
-import javax.ws.rs.{FormParam, _}
+import javax.ws.rs.{Consumes, FormParam, _}
 import javax.ws.rs.core.MediaType.APPLICATION_JSON
 import javax.ws.rs.core.{MediaType, Response}
 
 import com.akrainio.cmps128.hw4.KeyValueService._
 import com.akrainio.cmps128.hw4.KeyValueServiceJersey._
 
-import scala.Int.int2float
-
-
 //noinspection TypeAnnotation
 @Singleton
 @Path("/kvs/")
 class KeyValueServiceJersey extends KeyValueService {
 
-  val ThisIpport = sys.env.get("IPPORT") match {
-    case Some(x) => x
-    case None => throw envException
-  }
+  val ThisIpport: String = sys.env("IPPORT")
 
-  var k: Int = sys.env.get("K") match {
-    // Should I try/catch the number format exception?
-    case Some(x) => x.toInt
-    case None => throw envException
-  }
+  private val Logger = getLogger(classOf[KeyValueServiceJersey].getName + ThisIpport)
 
-  var view = sys.env.get("VIEW") match {
-    case Some(x) => new ViewController(ThisIpport, k, x)
-    case None => throw envException
-  }
+  val k: Int = sys.env("K").toInt
 
-  def envException: IllegalStateException = new IllegalStateException
+  val view: ViewController = sys.env.get("VIEW") match {
+    case Some(v) => new ViewController(ThisIpport, k, v)
+    case None => new ViewController(ThisIpport, k, "")
+  }
 
   @GET
   @Path("{key}")
   @Produces(Array(APPLICATION_JSON))
-  override def get(@PathParam("key") key: String) = validateKey(key) {
-    getDelegate(key).get(key)
+  // Client accessible get, can also be called be called by proxy to redirect client request
+  override def get(@PathParam("key") key: String): Response = validateKey(key) {
+     key match {
+      case "get_partition_id" => jsonResp(200)(
+        "msg" -> "success",
+        "partition_id" -> view.getPartitionId
+      )
+      case "get_all_partition_ids" => jsonResp(200)(
+        "msg" -> "success",
+        "partition_id_list" -> view.getPartitionIDs
+      )
+//      case "get_partition_members" => jsonResp(200)(
+//        "msg" -> "success",
+//        "partition_members" -> view.getPartitionMembers
+//      )
+      case _ =>
+        if (view.keyBelongs(key)) {
+          return view.kvsImpl.get(key)
+        }
+        sendRequestToPartition(key)(_.get(key))
+    }
   }
 
-  @DELETE
-  @Path("{key}")
-  @Produces(Array(APPLICATION_JSON))
-  override def del(@PathParam("key") key: String) = validateKey(key) {
-    getDelegate(key).del(key)
+  @GET
+  @Path("get_partition_members")
+  def getPartitionId(@QueryParam("partition_id") partitionId: String): Response = {
+    jsonResp(200)(
+      "msg" -> "success",
+      "partition_members" -> view.getPartitionMembers
+    )
   }
 
   @PUT
   @Path("{key}")
   @Produces(Array(APPLICATION_JSON))
-  override def put(@PathParam("key") key: String, @FormParam("val") value: String) = validateKey(key) {
-    if (value == null) {
-      jsonResp(403)(
-        "msg" -> "error",
-        "error" -> "value cannot be null"
-      )
+  // Client accessible put, can also be called be called by proxy to redirect client request.
+  // Puts into local KVS and propagates putInternal to replicas, redirects client otherwise.
+  override def put(@PathParam("key") key: String, @FormParam("val") value: String): Response = validateKey(key) {
+    if (value == null) jsonResp(403)(
+      "msg" -> "error",
+      "error" -> "value cannot be null"
+    )
+    else if (view.keyBelongs(key)) {
+      for (repl <- view.getOtherRepls(key).filterNot(_.ThisIpport == ThisIpport)) {
+        repl.putInternal("", key, value)
+      }
+      view.kvsImpl.put(key, value)
     } else {
-      getDelegate(key).put(key, value)
+      sendRequestToEntirePartition(key)(_.putInternal("", key, value)) match {
+        case true => jsonResp(200)(
+          "msg" -> "success",
+          "partition_id" -> view.getPartitionId,
+          "number_of_partitions" -> view.getPartitionIDs.length
+        )
+        case false => jsonResp(403)(
+          "msg" -> "error",
+          "error" -> "All nodes in partition inaccessible"
+        )
+      }
     }
+  }
+
+  @PUT
+  @Path("{key}")
+  // Non propagating put request, sent by a replica to other replicas
+  override def putInternal(@FormParam("internal") internal: String, @PathParam("key") key: String, @FormParam("val") value: String) = {
+    view.kvsImpl.put(key, value)
   }
 
   @PUT
   @Path("view_update")
   @Produces(Array(APPLICATION_JSON))
+  // Sent by client to inform the addition or removal of a node. Propagated to all nodes as internal_update
   override def updateView(@QueryParam("type") updateType: String, @FormParam("ip_port") ipport: String) = updateType match {
     case "add" =>
-      addNode(ipport)
+      view.addNode(ipport)
       jsonResp(200)("msg" -> "success")
 
     case "remove" =>
-      delNode(ipport)
+      view.delNode(ipport)
       jsonResp(200)("msg" -> "success")
 
     case _ => jsonResp(403)(
@@ -83,29 +120,26 @@ class KeyValueServiceJersey extends KeyValueService {
   @PUT
   @Path("internal_update")
   @Produces(Array(APPLICATION_JSON))
+  // Sent to all nodes when a node gets an updateView request from client. Locally updates view.
   override def internalUpdate(@FormParam("new_view") newView: String) = {
-    view = makeView(newView)
+    view.setView(newView)
     jsonResp(200)("msg" -> "success")
   }
 
   @POST
   @Path("rebalance")
   @Produces(Array(APPLICATION_JSON))
+  // Sent by a node that receives a view update after it sends an internal update to all nodes. Rebalances local kvs.
   override def rebal() = {
-    rebalance()
+    view.rebalanceSelf()
     jsonResp(200)("msg" -> "success")
   }
 
-  /**
-    * Additional put method for cases when value is not provided
-    *
-    * @param key doesn't matter
-    * @return Always returns error response
-    */
   @PUT
   @Path("{key}")
   @Produces(Array(APPLICATION_JSON))
   @Consumes(Array(MediaType.TEXT_PLAIN))
+  // Additional put method for cases when value is not provided
   def put(@PathParam("key") key: String) = validateKey(key) {
     jsonResp(403)(
       "msg" -> "error",
@@ -113,75 +147,40 @@ class KeyValueServiceJersey extends KeyValueService {
     )
   }
 
-  private def addNode(ipport: String): Unit = {
-    // for (part <- view.zipWithIndex) {
-    //   if (part._1.length < k) {
-    //     view(part._2) = part._1 :+ (new KeyValueServiceProxy(ipport), ipport)
-    //   }
-    // }
-    // view = view :+ (new KeyValueServiceProxy(ipport), ipport)
-    var flag = false
-    view = for {
-      partition <- view
-    } yield {
-      if (flag) {
-        partition
-      } else {
-        if (partition.length < k) {
-          flag = true
-          partition :+ (new KeyValueServiceProxy(ipport), ipport)
-        } else {
-          partition
-        }
+  // Sends given request to all responding nodes in another partition
+  def sendRequestToEntirePartition(key: String)(f: KeyValueService => Response): Boolean = {
+    var success = false
+    for (repl <- view.getRepls(key)) {
+      try {
+        f(repl)
+        success = true
+      } catch {
+        case _ :IOException =>
       }
     }
-
-    // for (n <- view) n._1.internalUpdate(viewToString(view))
-    forNodeInView(view, n: (KeyValueService, String) => n._1.internalUpdate(viewToString(view)))
-    // for (n <- view) n._1.rebal()
-    // Do I need to call fixNodeIndex?
-    forNodeInView(view, n: (KeyValueService, String) => n._1.rebal())
-    rebalance()
+    success
   }
 
-  private def delNode(ipport: String): Unit = {
-    val oldView = view
-    view = for {
-      partition <- view
-    } yield {
-      val filteredPart = partition.filterNot((p: (KeyValueService, String)) => p._2 == ipport)
+  // Sends given request to first responding node in another partition
+  def sendRequestToPartition(key: String)(f: KeyValueService => Response): Response = {
+    for (repl <- view.getRepls(key)) {
+      try {
+        return f(repl)
+      } catch {
+        case _ :IOException =>
+      }
     }
-    forNodeInView(oldView, n: (KeyValueService, String) => n._1.internalUpdate(viewToString(view)))
-    fixNodeIndex()
-    forNodeInView(oldView, n: (KeyValueService, String) => n._1.rebal())
-    rebalance()
-    //
-    // view = view.filterNot((p: (KeyValueService, String)) => p._2 == ipport)
-    // for (n <- oldView) n._1.internalUpdate(viewToString(view))
-    // fixNodeIndex()
-    // for (n <- oldView) n._1.rebal()
-    // rebalance()
-  }
-
-  private def rebalance(): Unit = {
-    fixNodeIndex()
-    val evicted = kvsImpl.rebalance(NodeIndex)(getNode)
-    for (e: (Int, (String, String)) <- evicted) {
-      view(e._1)._1.put(e._2._1, e._2._2)
-    }
-  }
-
-  private def getDelegate(key: String): KeyValueService = view(getNode(key.hashCode))._1
-
-  private def fixNodeIndex(): Unit = {
-    NodeIndex = -1
-    for (n <- view.zipWithIndex) if (n._1._2 == ThisIpport) NodeIndex = n._2
+    jsonResp(403)(
+      "msg" -> "error",
+      "error" -> "all nodes in partition down"
+    )
   }
 
 }
 
 object KeyValueServiceJersey {
 
+  // Checks to make sure key isn't too long.
   private def validateKey(key: String)(f: => Response): Response = {
     if (key.length > 250) jsonResp(403)(
       "msg"   -> "error",
