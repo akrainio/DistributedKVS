@@ -11,15 +11,17 @@ trait KeyValueService {
 
   val ThisIpport: String
 
-  def get(key: String): Response
+  def get(payload: String, key: String): Response
 
-  def put(key: String, value: String): Response
+  def put(payload: String, key: String, value: String): Response
 
   def putInternal(internal: String, key: String, value: String): Response
 
   def updateView(updateType: String, ipport: String): Response
 
   def internalUpdate(newView: String): Unit
+
+//  def gossip(payload: String, kvs: String): Response
 
   def rebal(): Response
 

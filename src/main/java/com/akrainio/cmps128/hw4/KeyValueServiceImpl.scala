@@ -15,31 +15,42 @@ class KeyValueServiceImpl(val ThisIpport: String) extends KeyValueService{
 
   private val Logger = getLogger(classOf[KeyValueServiceJersey].getName + ThisIpport)
 
+  var clock = new Clock(ThisIpport)
+
+  var pId = 0
+
   val map: concurrent.Map[String, String] = new ConcurrentHashMap[String, String].asScala
 
-  override def get(key: String) = map.get(key) match {
-    case Some(value) => jsonResp(200)(
+  override def get(payload: String, key: String) = map.get(key) match {
+    case Some(value) =>
+      if (payload != "") {
+        clock.combine(new Clock(payload))
+      }
+      clock.increment(ThisIpport)
+      jsonResp(200)(
       "msg"   -> "success",
       "value" -> value,
-      "owner" -> ThisIpport
+      "partition_id" -> pId,
+      "causal_payload" -> clock.pack,
+      "timestamp" -> System.currentTimeMillis()
     )
     case None => jsonResp(404)(
       "msg"   -> "error",
-      "error" -> "key does not exist",
-      "owner" -> ThisIpport
+      "error" -> "key does not exist"
     )
   }
 
-  override def put(key: String, value: String) = map.put(key, value) match {
-    case Some(_) => jsonResp(200)(
-      "replaced" -> 1,
+  override def put(payload: String, key: String, value: String) = {
+    map.put(key, value)
+    if (payload != "") {
+      clock.combine(new Clock(payload))
+    }
+    clock.increment(ThisIpport)
+    jsonResp(200)(
       "msg" -> "success",
-      "owner" -> ThisIpport
-    )
-    case None => jsonResp(201)(
-      "replaced" -> 0,
-      "msg" -> "success",
-      "owner" -> ThisIpport
+      "partition_id" -> pId,
+      "causal_payload" -> clock.pack,
+      "timestamp" -> System.currentTimeMillis()
     )
   }
 
@@ -51,8 +62,7 @@ class KeyValueServiceImpl(val ThisIpport: String) extends KeyValueService{
     )
     case None => jsonResp(404)(
       "msg" -> "error",
-      "error" -> "key does not exist",
-      "owner" -> ThisIpport
+      "error" -> "key does not exist"
     )
   }
 
@@ -69,6 +79,19 @@ class KeyValueServiceImpl(val ThisIpport: String) extends KeyValueService{
       }
     }
     evicted
+  }
+
+  def getAllKeys: (String, String) = {
+    (clock.pack, pack)
+  }
+
+  def pack: String = {
+    val stringBuilder = new StringBuilder
+    for ((k, v) <- map) {
+      stringBuilder.append(s"!$k,$v")
+    }
+    stringBuilder.deleteCharAt(0)
+    stringBuilder.toString
   }
 
   override def updateView(updateType: String, ipport: String) = {

@@ -30,7 +30,7 @@ class KeyValueServiceJersey extends KeyValueService {
   @Path("{key}")
   @Produces(Array(APPLICATION_JSON))
   // Client accessible get, can also be called be called by proxy to redirect client request
-  override def get(@PathParam("key") key: String): Response = validateKey(key) {
+  override def get(@QueryParam("causal_payload") payload: String, @PathParam("key") key: String): Response = validateKey(key) {
      key match {
       case "get_partition_id" => jsonResp(200)(
         "msg" -> "success",
@@ -40,15 +40,11 @@ class KeyValueServiceJersey extends KeyValueService {
         "msg" -> "success",
         "partition_id_list" -> view.getPartitionIDs
       )
-//      case "get_partition_members" => jsonResp(200)(
-//        "msg" -> "success",
-//        "partition_members" -> view.getPartitionMembers
-//      )
       case _ =>
         if (view.keyBelongs(key)) {
-          return view.kvsImpl.get(key)
+          return view.kvsImpl.get(payload, key)
         }
-        sendRequestToPartition(key)(_.get(key))
+        sendRequestToPartition(key)(_.get(payload, key))
     }
   }
 
@@ -61,12 +57,18 @@ class KeyValueServiceJersey extends KeyValueService {
     )
   }
 
+//  @PUT
+//  @Path("gossip")
+//  @Produces(Array(APPLICATION_JSON))
+//  override def put(@FormParam("causal_payload") payload: String, @FormParam("kvs") kvs: String): Response = {
+//  }
+
   @PUT
   @Path("{key}")
   @Produces(Array(APPLICATION_JSON))
   // Client accessible put, can also be called be called by proxy to redirect client request.
   // Puts into local KVS and propagates putInternal to replicas, redirects client otherwise.
-  override def put(@PathParam("key") key: String, @FormParam("val") value: String): Response = validateKey(key) {
+  override def put(@FormParam("causal_payload") payload: String, @PathParam("key") key: String, @FormParam("val") value: String): Response = validateKey(key) {
     if (value == null) jsonResp(403)(
       "msg" -> "error",
       "error" -> "value cannot be null"
@@ -75,7 +77,7 @@ class KeyValueServiceJersey extends KeyValueService {
       for (repl <- view.getOtherRepls(key).filterNot(_.ThisIpport == ThisIpport)) {
         repl.putInternal("", key, value)
       }
-      view.kvsImpl.put(key, value)
+      view.kvsImpl.put(payload, key, value)
     } else {
       sendRequestToEntirePartition(key)(_.putInternal("", key, value)) match {
         case true => jsonResp(200)(
@@ -95,7 +97,7 @@ class KeyValueServiceJersey extends KeyValueService {
   @Path("{key}")
   // Non propagating put request, sent by a replica to other replicas
   override def putInternal(@FormParam("internal") internal: String, @PathParam("key") key: String, @FormParam("val") value: String) = {
-    view.kvsImpl.put(key, value)
+    view.kvsImpl.put("", key, value)
   }
 
   @PUT

@@ -1,5 +1,6 @@
 package com.akrainio.cmps128.hw4
 
+import java.util.TimerTask
 import java.util.logging.Logger.getLogger
 
 import scala.Int.int2float
@@ -10,7 +11,8 @@ class ViewController(val ThisIpport: String, val k: Int, viewString: String) {
 
   val kvsImpl = new KeyValueServiceImpl(ThisIpport)
 
-  var view: List[List[KeyValueService]] = initView(viewString)
+  var view: List[List[KeyValueService]] = List(List(kvsImpl))
+  initView(viewString)
 
   // Called when this node receives a view update (not internal update!)
   def addNode(ipport: String): Unit = {
@@ -20,7 +22,7 @@ class ViewController(val ThisIpport: String, val k: Int, viewString: String) {
       else stringBuilder.append(",").append(s)
     }
     val newView = stringBuilder.append(",").append(ipport).toString
-    view = initView(newView)
+    initView(newView)
     internalUpdateOthers(None)
     rebalanceAll(None)
   }
@@ -34,7 +36,7 @@ class ViewController(val ThisIpport: String, val k: Int, viewString: String) {
       else stringBuilder.append(",").append(s)
     }
     val newView = stringBuilder.toString()
-    view = initView(newView)
+    initView(newView)
     internalUpdateOthers(Some(delRepl))
     rebalanceAll(Some(delRepl))
   }
@@ -50,7 +52,7 @@ class ViewController(val ThisIpport: String, val k: Int, viewString: String) {
     val evicted = kvsImpl.rebalance(curPartition)(getPartition)
     for (e: (Int, (String, String)) <- evicted) {
       val (newPart, (key, value)) = e
-      view(newPart).foreach((kvs: KeyValueService) => kvs.put(key, value))
+      view(newPart).foreach((kvs: KeyValueService) => kvs.put("", key, value))
     }
   }
 
@@ -88,29 +90,33 @@ class ViewController(val ThisIpport: String, val k: Int, viewString: String) {
 //  }
 
   def setView(newView: String): Unit = {
-    view = initView(newView)
+    initView(newView)
   }
 
-  def initView(newView: String): List[List[KeyValueService]] = {
-    if (newView == "") return List(List(kvsImpl))
-    val nodes = newView.split(",").toList
-    val PartitionCount = math.ceil(nodes.length.toDouble / k).toInt - 1
-    List.tabulate(PartitionCount + 1) { i =>
-      val l: Int = i match {
-        case PartitionCount =>
-          nodes.length % k match {
-            case 0 => k
-            case x => x
+  def initView(newView: String): Unit = {
+    if (newView == "") view = List(List(kvsImpl))
+    else {
+      val nodes = newView.split(",").toList
+      val PartitionCount = math.ceil(nodes.length.toDouble / k).toInt - 1
+      view = List.tabulate(PartitionCount + 1) { i =>
+        val l: Int = i match {
+          case PartitionCount =>
+            nodes.length % k match {
+              case 0 => k
+              case x => x
+            }
+          case _ => k
+        }
+        List.tabulate(l) { j =>
+          nodes(i * k + j) match {
+            case ThisIpport => kvsImpl
+            case n => new KeyValueServiceProxy(n)
           }
-        case _ => k
-      }
-      List.tabulate(l) { j =>
-        nodes(i * k + j) match {
-          case ThisIpport => kvsImpl
-          case n => new KeyValueServiceProxy(n)
         }
       }
     }
+    val (_, pId, _) = findSelf
+    kvsImpl.pId = pId
   }
 
   private def runOnAllNodes(extraNode: Option[KeyValueService])(f: KeyValueService => Unit): Unit = {
@@ -226,5 +232,12 @@ class ViewController(val ThisIpport: String, val k: Int, viewString: String) {
     }
     builder.toString
   }
+//
+//  override def run() = {
+//    val repls = getOtherRepls(ThisIpport)
+//    for (repl: KeyValueServiceProxy <- repls) {
+//
+//    }
+//  }
 
 }

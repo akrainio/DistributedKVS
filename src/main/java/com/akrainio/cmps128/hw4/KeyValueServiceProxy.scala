@@ -16,10 +16,10 @@ class KeyValueServiceProxy(val ThisIpport: String) extends KeyValueService {
 
   private val Logger = getLogger(classOf[KeyValueServiceJersey].getName + ThisIpport)
 
-  override def get(key: String) = sendRequest(cl.path(key).request.get())
+  override def get(payload: String, key: String) = sendRequest(cl.path(key).queryParam("causal_payload", payload).request.get())
 
-  override def put(key: String, value: String) = {
-    sendRequest(cl.path(key).request.put(form(toMultiValuedMap("val", value))))
+  override def put(payload: String, key: String, value: String) = {
+    sendRequest(cl.path(key).queryParam("causal_payload", payload).request.put(form(toMultiValuedMap("val", value))))
   }
 
   override def putInternal(internal: String, key: String, value: String) = {
@@ -33,6 +33,8 @@ class KeyValueServiceProxy(val ThisIpport: String) extends KeyValueService {
   override def internalUpdate(newView: String) = {
     sendRequest(cl.path("internal_update").request.put(form(toMultiValuedMap("new_view", newView))))
   }
+
+//  override def gossip(payload: String, kvs: String) = sendRequest(cl.path("gossip").queryParam("causal_payload", payload).request.put(form(toMultiValuedMap("kvs", kvs))))
 
   override def rebal() = sendRequest(cl.path("rebalance").request.post(Entity.text("")))
 
