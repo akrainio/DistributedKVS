@@ -82,6 +82,33 @@ class KeyValueServiceJersey extends KeyValueService {
   }
 
   @PUT
+  @Path("update_view")
+  @Produces(Array(APPLICATION_JSON))
+  // Sent by client to inform the addition or removal of a node. Propagated to all nodes as internal_update
+  override def updateView(@QueryParam("type") updateType: String,
+                          @FormParam("ip_port") ipport: String) = updateType match {
+    case "add" =>
+      view.addNode(ipport)
+      jsonResp(200)(
+        "msg" -> "success",
+        "partition_id" -> view.getPartitionId,
+        "number_of_partitions" -> view.getPartitionMembers.length
+      )
+
+    case "remove" =>
+      view.delNode(ipport)
+      jsonResp(200)(
+        "msg" -> "success",
+        "number_of_partitions" -> view.getPartitionMembers.length
+      )
+
+    case _ => jsonResp(403)(
+      "msg" -> "error",
+      "error" -> "update type not specified"
+    )
+  }
+
+  @PUT
   @Path("{key}")
   @Produces(Array(APPLICATION_JSON))
   // Client accessible put, can also be called be called by proxy to redirect client request.
@@ -119,26 +146,6 @@ class KeyValueServiceJersey extends KeyValueService {
                            @PathParam("key") key: String,
                            @FormParam("val") value: String) = {
     view.kvsImpl.put(payload, key, value)
-  }
-
-  @PUT
-  @Path("view_update")
-  @Produces(Array(APPLICATION_JSON))
-  // Sent by client to inform the addition or removal of a node. Propagated to all nodes as internal_update
-  override def updateView(@QueryParam("type") updateType: String,
-                          @FormParam("ip_port") ipport: String) = updateType match {
-    case "add" =>
-      view.addNode(ipport)
-      jsonResp(200)("msg" -> "success")
-
-    case "remove" =>
-      view.delNode(ipport)
-      jsonResp(200)("msg" -> "success")
-
-    case _ => jsonResp(403)(
-      "msg" -> "error",
-      "error" -> "update type not specified"
-    )
   }
 
   @PUT

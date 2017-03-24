@@ -82,11 +82,17 @@ class KeyValueServiceImpl(val ThisIpport: String) extends KeyValueService{
   }
 
   def pack: String = {
-    if (map.isEmpty) ""
+    if (map.isEmpty) {
+      ""
+    }
     else {
       val stringBuilder = new StringBuilder
       for ((k, v) <- map) {
         stringBuilder.append(s"!$k,$v")
+      }
+      if (stringBuilder.isEmpty) {
+        val c = stringBuilder
+        val b = c
       }
       stringBuilder.deleteCharAt(0)
       stringBuilder.toString
@@ -130,7 +136,7 @@ class KeyValueServiceImpl(val ThisIpport: String) extends KeyValueService{
   override def gossipAck(payload: String, kvs: String) = ???
 
   def noteEvent(payload: String): Unit = {
-    if (payload != null) {
+    if (payload != null && payload != "") {
       clock = clock.combine(Clock.unPack(payload))
     }
     clock.increment(ThisIpport)

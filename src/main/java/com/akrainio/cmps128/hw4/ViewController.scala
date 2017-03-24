@@ -232,7 +232,11 @@ class ViewController(val ThisIpport: String, val k: Int, viewString: String) {
     val otherClock = Clock.unPack(payload)
     def win(): Unit = {
       kvsImpl.clock = kvsImpl.clock.combine(otherClock)
-      findNode(sender)._1.gossipAck(kvsImpl.clock.pack, kvsImpl.pack)
+      try {
+        findNode(sender)._1.gossipAck(kvsImpl.clock.pack, kvsImpl.pack)
+      } catch {
+        case e: NullPointerException =>
+      }
     }
     def lose(): Unit = {
       kvsImpl.setKvs(payload, kvs)
@@ -279,7 +283,7 @@ class ViewController(val ThisIpport: String, val k: Int, viewString: String) {
 
   def gossip(): Unit = {
     val randGen = new Random()
-    Thread.sleep(randGen.nextInt(20) + 5)
+    Thread.sleep(randGen.nextInt(10) + 100)
     if (getPartitionMembers.length != 1) {
       val repls = getOtherRepls(ThisIpport)
       var r = randGen.nextInt(repls.length)

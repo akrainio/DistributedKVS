@@ -29,7 +29,7 @@ class KeyValueServiceProxy(val ThisIpport: String) extends KeyValueService {
   }
 
   override def updateView(updateType: String, ipport: String) = {
-    sendRequest(cl.path("view_update").queryParam("type", updateType).request.put(mkForm(Seq(("ip_port", ipport)))))
+    sendRequest(cl.path("update_view").queryParam("type", updateType).request.put(mkForm(Seq(("ip_port", ipport)))))
   }
 
   override def internalUpdate(newView: String) = {
