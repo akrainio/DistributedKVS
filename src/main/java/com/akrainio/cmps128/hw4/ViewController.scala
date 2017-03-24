@@ -1,10 +1,10 @@
 package com.akrainio.cmps128.hw4
 
-import java.util.TimerTask
+import java.util.{Random, TimerTask}
 import java.util.logging.Logger.getLogger
 
 import scala.Int.int2float
-
+// timertask
 class ViewController(val ThisIpport: String, val k: Int, viewString: String) {
 
   private val Logger = getLogger(classOf[KeyValueServiceJersey].getName + ThisIpport)
@@ -13,6 +13,24 @@ class ViewController(val ThisIpport: String, val k: Int, viewString: String) {
 
   var view: List[List[KeyValueService]] = List(List(kvsImpl))
   initView(viewString)
+
+  val worker = new Runnable() {
+    @Override
+    def run(): Unit = {
+      while (true) {
+        try {
+          gossip()
+        } catch {
+          case e: InterruptedException =>
+            throw new AssertionError(e)
+        }
+      }
+    }
+  }
+
+  val thread = new Thread(worker)
+
+  thread.start()
 
   // Called when this node receives a view update (not internal update!)
   def addNode(ipport: String): Unit = {
@@ -210,6 +228,32 @@ class ViewController(val ThisIpport: String, val k: Int, viewString: String) {
     pIndex
   }
 
+  def receiveGossip(payload: String, kvs: String, sender: String, timeStamp: String): Unit = {
+    val otherClock = Clock.unPack(payload)
+    def win(): Unit = {
+      kvsImpl.clock = kvsImpl.clock.combine(otherClock)
+      findNode(sender)._1.gossipAck(kvsImpl.clock.pack, kvsImpl.pack)
+    }
+    def lose(): Unit = {
+      kvsImpl.setKvs(payload, kvs)
+      kvsImpl.clock = kvsImpl.clock.combine(otherClock)
+      findNode(sender)._1.gossipAck(kvsImpl.clock.pack, "youWon")
+    }
+    kvsImpl.clock.getCausality(otherClock) match {
+      case -1 =>
+        lose()
+      case 0 =>
+        if (kvsImpl.timeStamp > timeStamp.toLong) win()
+        else lose()
+      case 1 =>
+        win()
+    }
+  }
+
+  def receiveGossipAck(payload: String, kvs: String): Unit = {
+    kvsImpl.setKvs(payload, kvs)
+  }
+
   override def toString: String = {
     val builder = new StringBuilder
     for ((partition, i) <- view.zipWithIndex) {
@@ -232,12 +276,16 @@ class ViewController(val ThisIpport: String, val k: Int, viewString: String) {
     }
     builder.toString
   }
-//
-//  override def run() = {
-//    val repls = getOtherRepls(ThisIpport)
-//    for (repl: KeyValueServiceProxy <- repls) {
-//
-//    }
-//  }
+
+  def gossip(): Unit = {
+    val randGen = new Random()
+    Thread.sleep(randGen.nextInt(20) + 5)
+    if (getPartitionMembers.length != 1) {
+      val repls = getOtherRepls(ThisIpport)
+      var r = randGen.nextInt(repls.length)
+      repls(r).gossip(kvsImpl.getClock, kvsImpl.pack, ThisIpport, kvsImpl.timeStamp.toString)
+    }
+
+  }
 
 }

@@ -15,13 +15,15 @@ trait KeyValueService {
 
   def put(payload: String, key: String, value: String): Response
 
-  def putInternal(internal: String, key: String, value: String): Response
+  def putInternal(internal: String, payload: String, key: String, value: String): Response
 
   def updateView(updateType: String, ipport: String): Response
 
   def internalUpdate(newView: String): Unit
 
-//  def gossip(payload: String, kvs: String): Response
+  def gossip(payload: String, kvs: String, sender: String, timeStamp: String): Unit
+
+  def gossipAck(payload: String, kvs: String): Unit
 
   def rebal(): Response
 
@@ -37,9 +39,11 @@ object KeyValueService {
     Response.status(status).entity(toJson(keyVals)).build()
   }
 
-  def toMultiValuedMap(key: String, value: String): MultivaluedMap[String, String] = {
+  def toMultiValuedMap(pairs: Seq[(String, String)]): MultivaluedMap[String, String] = {
     val stringMap = new MultivaluedStringMap()
-    stringMap.add(key, value)
+    for ((key, value) <- pairs) {
+      stringMap.add(key, value)
+    }
     stringMap
   }
 

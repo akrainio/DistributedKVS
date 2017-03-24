@@ -9,7 +9,7 @@ import requests as req
 import time
 
 NODE_COUNTER = 2
-PRINT_HTTP_REQUESTS = False
+PRINT_HTTP_REQUESTS = True
 PRINT_HTTP_RESPONSES = False
 AVAILABILITY_THRESHOLD = 1
 TB = 5

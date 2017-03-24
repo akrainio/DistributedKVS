@@ -30,7 +30,8 @@ class KeyValueServiceJersey extends KeyValueService {
   @Path("{key}")
   @Produces(Array(APPLICATION_JSON))
   // Client accessible get, can also be called be called by proxy to redirect client request
-  override def get(@QueryParam("causal_payload") payload: String, @PathParam("key") key: String): Response = validateKey(key) {
+  override def get(@QueryParam("causal_payload") payload: String,
+                   @PathParam("key") key: String): Response = validateKey(key) {
      key match {
       case "get_partition_id" => jsonResp(200)(
         "msg" -> "success",
@@ -40,6 +41,11 @@ class KeyValueServiceJersey extends KeyValueService {
         "msg" -> "success",
         "partition_id_list" -> view.getPartitionIDs
       )
+      case "testGossip" =>
+        view.gossip()
+        jsonResp(200)(
+          "msg" -> "success"
+        )
       case _ =>
         if (view.keyBelongs(key)) {
           return view.kvsImpl.get(payload, key)
@@ -50,42 +56,54 @@ class KeyValueServiceJersey extends KeyValueService {
 
   @GET
   @Path("get_partition_members")
-  def getPartitionId(@QueryParam("partition_id") partitionId: String): Response = {
+  def getPartitionId: Response = {
     jsonResp(200)(
       "msg" -> "success",
       "partition_members" -> view.getPartitionMembers
     )
   }
 
-//  @PUT
-//  @Path("gossip")
-//  @Produces(Array(APPLICATION_JSON))
-//  override def put(@FormParam("causal_payload") payload: String, @FormParam("kvs") kvs: String): Response = {
-//  }
+  @PUT
+  @Path("gossip")
+  @Produces(Array(APPLICATION_JSON))
+  override def gossip(@FormParam("causal_payload") payload: String,
+                      @FormParam("kvs") kvs: String,
+                      @FormParam("sender") sender: String,
+                      @FormParam("timeStamp") timeStamp: String) = {
+    view.receiveGossip(payload, kvs, sender, timeStamp)
+  }
+
+  @PUT
+  @Path("gossipAck")
+  @Produces(Array(APPLICATION_JSON))
+  override def gossipAck(@FormParam("causal_payload") payload: String,
+                         @FormParam("kvs") kvs: String) = {
+    view.receiveGossipAck(payload, kvs)
+  }
 
   @PUT
   @Path("{key}")
   @Produces(Array(APPLICATION_JSON))
   // Client accessible put, can also be called be called by proxy to redirect client request.
   // Puts into local KVS and propagates putInternal to replicas, redirects client otherwise.
-  override def put(@FormParam("causal_payload") payload: String, @PathParam("key") key: String, @FormParam("val") value: String): Response = validateKey(key) {
+  override def put(@FormParam("causal_payload") payload: String,
+                   @PathParam("key") key: String,
+                   @FormParam("val") value: String): Response = validateKey(key) {
     if (value == null) jsonResp(403)(
       "msg" -> "error",
       "error" -> "value cannot be null"
     )
     else if (view.keyBelongs(key)) {
       for (repl <- view.getOtherRepls(key).filterNot(_.ThisIpport == ThisIpport)) {
-        repl.putInternal("", key, value)
+        repl.putInternal("", payload, key, value)
       }
       view.kvsImpl.put(payload, key, value)
     } else {
-      sendRequestToEntirePartition(key)(_.putInternal("", key, value)) match {
-        case true => jsonResp(200)(
-          "msg" -> "success",
-          "partition_id" -> view.getPartitionId,
-          "number_of_partitions" -> view.getPartitionIDs.length
-        )
-        case false => jsonResp(403)(
+      val resp = sendRequestToEntirePartition(key)(_.putInternal("", payload, key, value))
+      if (resp != null) {
+        resp
+      } else {
+        jsonResp(403)(
           "msg" -> "error",
           "error" -> "All nodes in partition inaccessible"
         )
@@ -96,15 +114,19 @@ class KeyValueServiceJersey extends KeyValueService {
   @PUT
   @Path("{key}")
   // Non propagating put request, sent by a replica to other replicas
-  override def putInternal(@FormParam("internal") internal: String, @PathParam("key") key: String, @FormParam("val") value: String) = {
-    view.kvsImpl.put("", key, value)
+  override def putInternal(@FormParam("internal") internal: String,
+                           @FormParam("causal_payload") payload: String,
+                           @PathParam("key") key: String,
+                           @FormParam("val") value: String) = {
+    view.kvsImpl.put(payload, key, value)
   }
 
   @PUT
   @Path("view_update")
   @Produces(Array(APPLICATION_JSON))
   // Sent by client to inform the addition or removal of a node. Propagated to all nodes as internal_update
-  override def updateView(@QueryParam("type") updateType: String, @FormParam("ip_port") ipport: String) = updateType match {
+  override def updateView(@QueryParam("type") updateType: String,
+                          @FormParam("ip_port") ipport: String) = updateType match {
     case "add" =>
       view.addNode(ipport)
       jsonResp(200)("msg" -> "success")
@@ -150,17 +172,16 @@ class KeyValueServiceJersey extends KeyValueService {
   }
 
   // Sends given request to all responding nodes in another partition
-  def sendRequestToEntirePartition(key: String)(f: KeyValueService => Response): Boolean = {
-    var success = false
+  def sendRequestToEntirePartition(key: String)(f: KeyValueService => Response): Response = {
+    var response: Response = null
     for (repl <- view.getRepls(key)) {
       try {
-        f(repl)
-        success = true
+        response = f(repl)
       } catch {
         case _ :IOException =>
       }
     }
-    success
+    response
   }
 
   // Sends given request to first responding node in another partition

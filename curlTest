@@ -1,9 +1,10 @@
 curl -X PUT -d "ip_port=localhost:8082" localhost:8080/kvs/view_update?type=add
 curl -X PUT -d "ip_port=localhost:8083" localhost:8082/kvs/view_update?type=add
 curl -X PUT -d "ip_port=localhost:8084" localhost:8081/kvs/view_update?type=add
-curl -X PUT -d "val=dude" localhost:8083/kvs/suh
+curl -X PUT -d "val=dude" localhost:8081/kvs/suh
 curl -X GET localhost:8083/kvs/suh
 curl -X GET localhost:8081/kvs/suh
+curl -X GET localhost:8080/kvs/suh
 curl -X PUT -d "ip_port=localhost:8083" localhost:8082/kvs/view_update?type=remove
 curl -X GET localhost:8081/kvs/suh
 

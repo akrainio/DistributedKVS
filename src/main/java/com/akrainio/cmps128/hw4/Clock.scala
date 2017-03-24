@@ -53,6 +53,7 @@ class Clock(val ThisIpport: String) {
       stringBuilder.append(s"!$k,$v")
     }
     stringBuilder.deleteCharAt(0)
+    stringBuilder.insert(0, ThisIpport + ">")
     stringBuilder.toString
   }
 
@@ -62,12 +63,15 @@ object Clock {
 
   def unPack(s: String): Clock = {
     var map: mutable.Map[String, Int] = mutable.Map.empty[String, Int]
-    for (p <- s.split("!")) {
+    val pair = s.split(">")
+    val ipport = pair(0)
+    val counters = pair(1)
+    for (p <- counters.split("!")) {
       val k = p.split(",")(0)
       val v = p.split(",")(1).toInt
       map += (k -> v)
     }
-    val result = new Clock("")
+    val result = new Clock(ipport)
     result.clock = map
     result
   }

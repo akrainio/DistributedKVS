@@ -2,5 +2,5 @@ mvn clean package
 cp target/*.war docker/tomcat/webapps/ROOT.war
 docker kill $(docker ps -q)
 docker rm $(docker ps -a -q)
-docker build -t hw3 .
+docker build -t hw4 .
 python test.py

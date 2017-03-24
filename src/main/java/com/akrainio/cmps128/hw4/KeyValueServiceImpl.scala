@@ -17,16 +17,15 @@ class KeyValueServiceImpl(val ThisIpport: String) extends KeyValueService{
 
   var clock = new Clock(ThisIpport)
 
+  var timeStamp = System.currentTimeMillis()
+
   var pId = 0
 
   val map: concurrent.Map[String, String] = new ConcurrentHashMap[String, String].asScala
 
   override def get(payload: String, key: String) = map.get(key) match {
     case Some(value) =>
-      if (payload != "") {
-        clock.combine(new Clock(payload))
-      }
-      clock.increment(ThisIpport)
+      noteEvent(payload)
       jsonResp(200)(
       "msg"   -> "success",
       "value" -> value,
@@ -42,10 +41,7 @@ class KeyValueServiceImpl(val ThisIpport: String) extends KeyValueService{
 
   override def put(payload: String, key: String, value: String) = {
     map.put(key, value)
-    if (payload != "") {
-      clock.combine(new Clock(payload))
-    }
-    clock.increment(ThisIpport)
+    noteEvent(payload)
     jsonResp(200)(
       "msg" -> "success",
       "partition_id" -> pId,
@@ -81,17 +77,20 @@ class KeyValueServiceImpl(val ThisIpport: String) extends KeyValueService{
     evicted
   }
 
-  def getAllKeys: (String, String) = {
-    (clock.pack, pack)
+  def getClock: String = {
+    clock.pack
   }
 
   def pack: String = {
-    val stringBuilder = new StringBuilder
-    for ((k, v) <- map) {
-      stringBuilder.append(s"!$k,$v")
+    if (map.isEmpty) ""
+    else {
+      val stringBuilder = new StringBuilder
+      for ((k, v) <- map) {
+        stringBuilder.append(s"!$k,$v")
+      }
+      stringBuilder.deleteCharAt(0)
+      stringBuilder.toString
     }
-    stringBuilder.deleteCharAt(0)
-    stringBuilder.toString
   }
 
   override def updateView(updateType: String, ipport: String) = {
@@ -106,8 +105,43 @@ class KeyValueServiceImpl(val ThisIpport: String) extends KeyValueService{
     throw new IOException(s"method 'rebal' not supported in KVSImpl.")
   }
 
-  override def putInternal(internal: String, key: String, value: String) = {
+  def setKvs(payload: String, kvs: String): Unit = {
+    kvs match {
+      case "youWon" =>
+      case "" =>
+        noteEventQuiet(payload)
+        map.clear()
+      case _ =>
+        noteEventQuiet(payload)
+        map.clear()
+        for (p <- kvs.split("!")) {
+          val k = p.split(",")(0)
+          val v = p.split(",")(1)
+          map += (k -> v)
+        }
+    }
+  }
+
+  override def putInternal(internal: String, payload: String, key: String, value: String) = {
     throw new IOException(s"method 'putInternal' not supported in KVSImpl. Params: [key = $key, value = $value]")
+  }
+
+  override def gossip(payload: String, kvs: String, sender: String, timeStamp: String) = ???
+  override def gossipAck(payload: String, kvs: String) = ???
+
+  def noteEvent(payload: String): Unit = {
+    if (payload != null) {
+      clock = clock.combine(Clock.unPack(payload))
+    }
+    clock.increment(ThisIpport)
+    timeStamp = System.currentTimeMillis()
+  }
+
+  def noteEventQuiet(payload: String): Unit = {
+    if (payload != null) {
+      clock = clock.combine(Clock.unPack(payload))
+    }
+    timeStamp = System.currentTimeMillis()
   }
 
 }
