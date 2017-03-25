@@ -92,14 +92,14 @@ class KeyValueServiceJersey extends KeyValueService {
       jsonResp(200)(
         "msg" -> "success",
         "partition_id" -> view.getPartitionId,
-        "number_of_partitions" -> view.getPartitionMembers.length
+        "number_of_partitions" -> view.getPartitionIDs.length
       )
 
     case "remove" =>
       view.delNode(ipport)
       jsonResp(200)(
         "msg" -> "success",
-        "number_of_partitions" -> view.getPartitionMembers.length
+        "number_of_partitions" -> view.getPartitionIDs.length
       )
 
     case _ => jsonResp(403)(

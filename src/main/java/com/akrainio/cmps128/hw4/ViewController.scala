@@ -283,13 +283,16 @@ class ViewController(val ThisIpport: String, val k: Int, viewString: String) {
 
   def gossip(): Unit = {
     val randGen = new Random()
-    Thread.sleep(randGen.nextInt(10) + 100)
+    try {
+      Thread.sleep(randGen.nextInt(10) + 100)
+    } catch {
+      case e: InterruptedException =>
+    }
     if (getPartitionMembers.length != 1) {
       val repls = getOtherRepls(ThisIpport)
       var r = randGen.nextInt(repls.length)
       repls(r).gossip(kvsImpl.getClock, kvsImpl.pack, ThisIpport, kvsImpl.timeStamp.toString)
     }
-
   }
 
 }

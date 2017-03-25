@@ -50,7 +50,7 @@ class Clock(val ThisIpport: String) {
   def pack: String = {
     val stringBuilder = new StringBuilder
     for ((k, v) <- clock) {
-      stringBuilder.append(s"!$k,$v")
+      stringBuilder.append(s"X$k,$v")
     }
     stringBuilder.deleteCharAt(0)
     stringBuilder.insert(0, ThisIpport + ">")
@@ -66,7 +66,7 @@ object Clock {
     val pair = s.split(">")
     val ipport = pair(0)
     val counters = pair(1)
-    for (p <- counters.split("!")) {
+    for (p <- counters.split("X")) {
       val k = p.split(",")(0)
       val v = p.split(",")(1).toInt
       map += (k -> v)

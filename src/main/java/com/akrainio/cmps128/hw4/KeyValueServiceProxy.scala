@@ -1,7 +1,7 @@
 package com.akrainio.cmps128.hw4
 
 import java.io.IOException
-import java.net.{ConnectException, URI}
+import java.net.{ConnectException, URI, UnknownHostException}
 import java.util.logging.Level
 import java.util.logging.Logger.getLogger
 import javax.ws.rs.client.ClientBuilder.newClient
@@ -68,6 +68,14 @@ class KeyValueServiceProxy(val ThisIpport: String) extends KeyValueService {
         jsonResp(404)(
           "msg" -> "error",
           "error" -> "service is not available"
+        )
+      case e: UnknownHostException =>
+        Logger.log(Level.SEVERE, e.getMessage, e)
+        val c = e
+        Logger.log(Level.SEVERE, e.getMessage, e)
+        jsonResp(404)(
+          "msg" -> "error",
+          "error" -> "???"
         )
     }
   }
